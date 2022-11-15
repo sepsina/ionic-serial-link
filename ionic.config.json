@@ -1,0 +1,7 @@
+{
+  "name": "ionic-serial-link",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}
