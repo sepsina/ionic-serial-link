@@ -1,3 +1,100 @@
-<ion-app>
-  <ion-router-outlet></ion-router-outlet>
-</ion-app>
+<div id="all-frame" resizeObserver (resize)="onResize($event)">
+    <div class="main-container" id="container">
+        <div id="serialPort" class="right-center">
+            <div class="left-center app-card-title">serial port</div>
+            <button mat-button (click)="serial.openComPort()">
+                <mat-icon>login</mat-icon>
+                Open
+            </button>
+            <button mat-button (click)="closeSerial()">
+                <mat-icon>close</mat-icon>
+                Close
+            </button>
+        </div>
+
+        <div *ngIf="serial.validPortFlag" id="secData" class="app-card">
+            <div class="right-center app-card-toolbar">
+                <div class="left-center app-card-title">security</div>
+                <button mat-button (click)="readKeys()">
+                    <mat-icon>file_download</mat-icon>
+                    Read
+                </button>
+                <button mat-button (click)="wrKeys()" [disabled]="!isSecValid()">
+                    <mat-icon>file_upload</mat-icon>
+                    Save
+                </button>
+            </div>
+            <div id="secGroup">
+                <mat-form-field id="nwkKey">
+                    <input matInput
+                        type="text"
+                        [maxlength]="16"
+                        placeholder="global link-key"
+                        [formControl]='nwkKeyFormCtrl'
+                        style="padding-left: 5px"
+                        autocomplete="off">
+                    <mat-hint align="end">16 characters</mat-hint>
+                    <mat-error *ngIf="nwkKeyFormCtrl.invalid">{{nwkKeyErr()}}</mat-error>
+                </mat-form-field>
+                <mat-form-field id="panId">
+                    <input matInput
+                        type="number"
+                        [max]="maxId"
+                        [min]="minId"
+                        placeholder="PAN ID"
+                        [formControl]="panIdFormCtrl"
+                        style="padding-left: 5px" />
+                    <mat-hint align="end">{{minId}} - {{maxId}}</mat-hint>
+                    <mat-error *ngIf="panIdFormCtrl.invalid">{{panIdErr()}}</mat-error>
+                </mat-form-field>
+            </div>
+        </div>
+
+        <div *ngIf="serial.validPortFlag" id="nodeData" class="app-card">
+            <ng-template #dynamic></ng-template>
+            <!-- <div [ngSwitch]="partNum">
+                <app-zb-bridge *ngSwitchCase="globals.ZB_BRIDGE"></app-zb-bridge>
+                <app-htu21d-005 *ngSwitchCase="globals.HTU21D_005"></app-htu21d-005>
+                <app-sh-006 *ngSwitchCase="globals.SH_006"></app-sh-006>
+                <app-bme280-007 *ngSwitchCase="globals.BME280_007"></app-bme280-007>
+                <app-ssr-009 *ngSwitchCase="globals.SSR_009"></app-ssr-009>
+                <app-actuator-010 *ngSwitchCase="globals.ACTUATOR_010"></app-actuator-010>
+                <app-dbl-sw-008 *ngSwitchCase="globals.DBL_SW_008"></app-dbl-sw-008>
+                <div *ngSwitchDefault class="center-center" style="height: 50px">
+                    --- no node data ---
+                </div>
+            </div> -->
+        </div>
+        <div *ngIf="serial.validPortFlag" id="devReset" class="right-center">
+            <div class="left-center app-card-title">device</div>
+            <button mat-button (click)="serial.softwareRstReq()">
+                <mat-icon>autorenew</mat-icon>
+                Soft Reset
+            </button>
+            <button mat-button (click)="serial.factoryRstReq()">
+                <mat-icon>touch_app</mat-icon>
+                Factory Reset
+            </button>
+        </div>
+        <div id="logs" class="app-card">
+            <div class="right-center app-card-toolbar">
+                <div class="left-center app-card-title">logs</div>
+                <button mat-button (click)="clearLogs()">
+                    <mat-icon>delete_forever</mat-icon>
+                    Clear
+                </button>
+                <mat-checkbox id="cbScroll"
+                            [ngModel]="scrollFlag"
+                            (ngModelChange)="autoScrollChange($event)"
+                            color="primary">
+                    autoscroll
+                </mat-checkbox>
+            </div>
+            <div id="logList">
+                <div *ngFor="let msg of logs" class="log-msg left-center">
+                    {{ msg }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

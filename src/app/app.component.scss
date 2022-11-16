@@ -1,0 +1,67 @@
+#all-frame {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: stretch;
+    //border: 3px solid red;
+    height: 100%;
+    box-sizing: border-box;
+    background-color: black;
+}
+.main-container{
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  //border: solid 1px red;
+  padding: 10px;
+  overflow: auto;
+  gap: 5px;
+  height: 100%;
+  overflow-y: scroll;
+  max-width: 400px;
+  background-color: white
+}
+#serialPort{
+  gap: 10px;
+  font-size: 0.9em;
+  border : solid 1px black;
+  //margin-top: 5px;
+  border-radius: 5px;
+}
+#secGroup{
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 5px;
+    gap: 5px;
+}
+#logs{
+  min-height: 250px;
+  flex: 1 1 auto;
+  overflow: auto;
+  margin-bottom: 5px;
+  border-radius: 5px;
+}
+#cbScroll{
+  padding-right: 10px;
+}
+#logList {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: auto;
+}
+.log-msg{
+  padding-left: 20px;
+  min-height: 20px;
+  //font-family: Consolas;
+  font-size: 0.8em;
+  border-bottom: solid 1px #ededed;
+}
+#devReset{
+  gap: 10px;
+  font-size: 0.9em;
+  border : solid 1px black;
+  border-radius: 5px;
+}
