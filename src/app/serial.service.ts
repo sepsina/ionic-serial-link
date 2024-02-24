@@ -6,53 +6,8 @@ import { UtilsService } from './utils.service';
 
 import { Serial, SerialOpenOptions, SerialPermissionOptions } from '@ionic-native/serial/ngx';
 
-enum eRxState {
-    E_STATE_RX_WAIT_START,
-    E_STATE_RX_WAIT_TYPELSB,
-    E_STATE_RX_WAIT_TYPEMSB,
-    E_STATE_RX_WAIT_LENLSB,
-    E_STATE_RX_WAIT_LENMSB,
-    E_STATE_RX_WAIT_CRC,
-    E_STATE_RX_WAIT_DATA,
-}
-const SL_START_CHAR = 0x01;
-const SL_ESC_CHAR = 0x02;
-const SL_END_CHAR = 0x03;
-
-const SL_MSG_LOG = 0x8001;
-const SL_MSG_TESTPORT = 0x0a09;
-const SL_MSG_USB_CMD = 0x0a0d;
-
-const USB_CMD_KEEP_AWAKE = 0x01;
-const USB_CMD_FACTORY_RESET = 0x02;
-const USB_CMD_SOFTWARE_RESET = 0x03;
-const USB_CMD_RD_KEYS = 0x04;
-const USB_CMD_WR_KEYS = 0x05;
-const USB_CMD_RD_NODE_DATA_0 = 0x06;
-const USB_CMD_WR_NODE_DATA_0 = 0x0a;
-const USB_CMD_READ_PART_NUM = 0x0e;
-
-const USB_CMD_STATUS_OK = 0x00;
-const USB_CMD_STATUS_FAIL = 0x01;
-
-export interface rdKeys_t {
-    status: number;
-    nwkKey: string;
-    panId: number;
-}
-
-export interface slMsg_t {
-    type: number;
-    data: number[];
-}
-
-//const BE = false;
-const LE = true;
-const HEAD_LEN = 5;
-const LEN_IDX = 2;
-const CRC_IDX = 4;
-
-//const DBG_MSG_LEN = 20;
+import * as gIF from './gIF';
+import * as gConst from './gConst';
 
 @Injectable({
     providedIn: 'root',
@@ -69,14 +24,14 @@ export class SerialService {
     private isEsc = false;
     private rxBuf = new ArrayBuffer(256);
     private rxMsg = new Uint8Array(this.rxBuf);
-    private rxState = eRxState.E_STATE_RX_WAIT_START;
+    private rxState = gIF.eRxState.E_STATE_RX_WAIT_START;
 
     private msgType = 0;
     private msgLen = 0;
 
     private seqNum = 0;
 
-    //trash: any;
+    trash: any;
 
     constructor(private serial: Serial,
                 private events: EventsService,
@@ -113,7 +68,7 @@ export class SerialService {
             try {
                 await this.serial.open(serialOpenOpt);
                 this.validPortFlag = true;
-                console.log('Serial connection opened');
+                this.utils.sendMsg('Serial connection opened', 'green');
                 this.serial.registerReadCallback().subscribe((data)=>{
                     this.slOnData(data);
                 });
@@ -122,11 +77,11 @@ export class SerialService {
                 }, 1000);
             }
             catch(err) {
-                console.log(`open serial err: ${err}`);
+                this.utils.sendMsg(`open serial err: ${err}`, 'red');
             }
         }
         catch(err) {
-            console.log(`req permission err: ${err}`);
+            this.utils.sendMsg(`req permission err: ${err}`, 'red');
         }
     }
 
@@ -157,19 +112,19 @@ export class SerialService {
         for(let i = 0; i < pkt.length; i++) {
             let rxByte = pkt[i];
             switch(rxByte) {
-                case SL_START_CHAR: {
+                case gConst.SL_START_CHAR: {
                     this.msgIdx = 0;
                     this.isEsc = false;
-                    this.rxState = eRxState.E_STATE_RX_WAIT_TYPELSB;
+                    this.rxState = gIF.eRxState.E_STATE_RX_WAIT_TYPELSB;
                     break;
                 }
-                case SL_ESC_CHAR: {
+                case gConst.SL_ESC_CHAR: {
                     this.isEsc = true;
                     break;
                 }
-                case SL_END_CHAR: {
+                case gConst.SL_END_CHAR: {
                     if(this.crc == this.calcCRC) {
-                        let slMsg: slMsg_t = {
+                        let slMsg: gIF.slMsg_t = {
                             type: this.msgType,
                             data: Array.from(this.rxMsg).slice(0, this.msgIdx),
                         };
@@ -177,7 +132,7 @@ export class SerialService {
                             this.processMsg(slMsg);
                         }, 0);
                     }
-                    this.rxState = eRxState.E_STATE_RX_WAIT_START;
+                    this.rxState = gIF.eRxState.E_STATE_RX_WAIT_START;
                     break;
                 }
                 default: {
@@ -186,40 +141,40 @@ export class SerialService {
                         this.isEsc = false;
                     }
                     switch(this.rxState) {
-                        case eRxState.E_STATE_RX_WAIT_START: {
+                        case gIF.eRxState.E_STATE_RX_WAIT_START: {
                             // ---
                             break;
                         }
-                        case eRxState.E_STATE_RX_WAIT_TYPELSB: {
+                        case gIF.eRxState.E_STATE_RX_WAIT_TYPELSB: {
                             this.msgType = rxByte;
-                            this.rxState = eRxState.E_STATE_RX_WAIT_TYPEMSB;
+                            this.rxState = gIF.eRxState.E_STATE_RX_WAIT_TYPEMSB;
                             this.calcCRC = rxByte;
                             break;
                         }
-                        case eRxState.E_STATE_RX_WAIT_TYPEMSB: {
+                        case gIF.eRxState.E_STATE_RX_WAIT_TYPEMSB: {
                             this.msgType += rxByte << 8;
-                            this.rxState = eRxState.E_STATE_RX_WAIT_LENLSB;
+                            this.rxState = gIF.eRxState.E_STATE_RX_WAIT_LENLSB;
                             this.calcCRC ^= rxByte;
                             break;
                         }
-                        case eRxState.E_STATE_RX_WAIT_LENLSB: {
+                        case gIF.eRxState.E_STATE_RX_WAIT_LENLSB: {
                             this.msgLen = rxByte;
-                            this.rxState = eRxState.E_STATE_RX_WAIT_LENMSB;
+                            this.rxState = gIF.eRxState.E_STATE_RX_WAIT_LENMSB;
                             this.calcCRC ^= rxByte;
                             break;
                         }
-                        case eRxState.E_STATE_RX_WAIT_LENMSB: {
+                        case gIF.eRxState.E_STATE_RX_WAIT_LENMSB: {
                             this.msgLen += rxByte << 8;
-                            this.rxState = eRxState.E_STATE_RX_WAIT_CRC;
+                            this.rxState = gIF.eRxState.E_STATE_RX_WAIT_CRC;
                             this.calcCRC ^= rxByte;
                             break;
                         }
-                        case eRxState.E_STATE_RX_WAIT_CRC: {
+                        case gIF.eRxState.E_STATE_RX_WAIT_CRC: {
                             this.crc = rxByte;
-                            this.rxState = eRxState.E_STATE_RX_WAIT_DATA;
+                            this.rxState = gIF.eRxState.E_STATE_RX_WAIT_DATA;
                             break;
                         }
-                        case eRxState.E_STATE_RX_WAIT_DATA: {
+                        case gIF.eRxState.E_STATE_RX_WAIT_DATA: {
                             if(this.msgIdx < this.msgLen) {
                                 this.rxMsg[this.msgIdx++] = rxByte;
                                 this.calcCRC ^= rxByte;
@@ -238,45 +193,45 @@ export class SerialService {
      * brief
      *
      */
-    private processMsg(msg: slMsg_t) {
+    private processMsg(msg: gIF.slMsg_t) {
 
         let msgData = new Uint8Array(msg.data);
 
         switch(msg.type) {
-            case SL_MSG_TESTPORT: {
+            case gConst.SL_MSG_TESTPORT: {
                 const msgView = new DataView(msgData.buffer);
                 let msgIdx = 0;
                 const msgSeqNum = msgView.getUint8(msgIdx++);
                 if(msgSeqNum === this.seqNum) {
-                    const testData = msgView.getUint32(msgIdx, LE);
+                    const testData = msgView.getUint32(msgIdx, gConst.LE);
                     if(testData === 0x67190110) {
                         // ---
                     }
                 }
                 break;
             }
-            case SL_MSG_USB_CMD: {
+            case gConst.SL_MSG_USB_CMD: {
                 let slMsg = new DataView(msgData.buffer);
                 let msgIdx = 0;
                 let msgSeqNum = slMsg.getUint8(msgIdx++);
                 if(msgSeqNum == this.seqNum) {
                     let cmdID = slMsg.getUint8(msgIdx++);
                     switch(cmdID) {
-                        case USB_CMD_KEEP_AWAKE: {
+                        case gConst.USB_CMD_KEEP_AWAKE: {
                             let status = slMsg.getUint8(msgIdx++);
-                            if(status == USB_CMD_STATUS_OK) {
+                            if(status == gConst.USB_CMD_STATUS_OK) {
                                 console.log('keep awake ok');
                             }
-                            if(status == USB_CMD_STATUS_FAIL) {
+                            if(status == gConst.USB_CMD_STATUS_FAIL) {
                                 console.log('keep awake fail');
                             }
                             break;
                         }
-                        case USB_CMD_RD_KEYS: {
+                        case gConst.USB_CMD_RD_KEYS: {
                             let status = slMsg.getUint8(msgIdx++);
-                            if(status == USB_CMD_STATUS_OK) {
-                                let rdKeysRsp = {} as rdKeys_t;
-                                rdKeysRsp.status = USB_CMD_STATUS_OK;
+                            if(status == gConst.USB_CMD_STATUS_OK) {
+                                let rdKeysRsp = {} as gIF.rdKeys_t;
+                                rdKeysRsp.status = gConst.USB_CMD_STATUS_OK;
                                 let i = 0;
                                 let chrCode = 0;
                                 let nwkKey = '';
@@ -287,16 +242,15 @@ export class SerialService {
                                     }
                                 }
                                 rdKeysRsp.nwkKey = nwkKey;
-                                rdKeysRsp.panId = slMsg.getUint16(msgIdx, LE);
+                                rdKeysRsp.panId = slMsg.getUint16(msgIdx, gConst.LE);
                                 this.events.publish('rdKeysRsp', rdKeysRsp);
                             }
                             else {
-                                this.events.publish('logMsg', 'read keys fail');
-                                console.log('read keys fail');
+                                this.utils.sendMsg('read keys fail', 'red');
                             }
                             break;
                         }
-                        case USB_CMD_RD_NODE_DATA_0: {
+                        case gConst.USB_CMD_RD_NODE_DATA_0: {
                             let dataLen = slMsg.getUint8(msgIdx++);
                             let nodeData = new Uint8Array(dataLen);
                             for(let i = 0; i < dataLen; i++) {
@@ -305,11 +259,11 @@ export class SerialService {
                             this.events.publish('rdNodeDataRsp', nodeData);
                             break;
                         }
-                        case USB_CMD_READ_PART_NUM: {
+                        case gConst.USB_CMD_READ_PART_NUM: {
                             let partNum = slMsg.getUint32(msgIdx, this.globals.LE);
                             msgIdx += 4;
                             this.events.publish('readPartNumRsp', partNum);
-                            this.events.publish('logMsg', `${this.utils.timeStamp()}: comm ok`);
+                            this.utils.sendMsg(`comm ok`, 'blue', 7);
                             setTimeout(()=>{
                                 this.readPartNum();
                             }, 5000);
@@ -322,10 +276,9 @@ export class SerialService {
                 }
                 break;
             }
-            case SL_MSG_LOG: {
+            case gConst.SL_MSG_LOG: {
                 let log_msg = String.fromCharCode.apply(null, msgData);
-                this.events.publish('logMsg', log_msg);
-                console.log(log_msg);
+                this.utils.sendMsg(log_msg);
                 break;
             }
         }
@@ -390,7 +343,7 @@ export class SerialService {
      *
      */
     public softwareRstReq() {
-        this.usbCmd(USB_CMD_SOFTWARE_RESET, null);
+        this.usbCmd(gConst.USB_CMD_SOFTWARE_RESET, null);
     }
 
     /***********************************************************************************************
@@ -400,7 +353,7 @@ export class SerialService {
      *
      */
     public factoryRstReq() {
-        this.usbCmd(USB_CMD_FACTORY_RESET, null);
+        this.usbCmd(gConst.USB_CMD_FACTORY_RESET, null);
     }
 
     /***********************************************************************************************
@@ -410,7 +363,7 @@ export class SerialService {
      *
      */
     public rdKeys() {
-        this.usbCmd(USB_CMD_RD_KEYS, null);
+        this.usbCmd(gConst.USB_CMD_RD_KEYS, null);
     }
 
     /***********************************************************************************************
@@ -424,7 +377,7 @@ export class SerialService {
             nwkKey: nwkKey,
             panId: panId
         };
-        this.usbCmd(USB_CMD_WR_KEYS, param);
+        this.usbCmd(gConst.USB_CMD_WR_KEYS, param);
     }
 
     /***********************************************************************************************
@@ -434,7 +387,7 @@ export class SerialService {
      *
      */
     public rdNodeData_0() {
-        this.usbCmd(USB_CMD_RD_NODE_DATA_0, null);
+        this.usbCmd(gConst.USB_CMD_RD_NODE_DATA_0, null);
     }
 
     /***********************************************************************************************
@@ -447,7 +400,7 @@ export class SerialService {
         let param = {
             buf: arrBuf,
         };
-        this.usbCmd(USB_CMD_WR_NODE_DATA_0, param);
+        this.usbCmd(gConst.USB_CMD_WR_NODE_DATA_0, param);
     }
 
     /***********************************************************************************************
@@ -457,7 +410,7 @@ export class SerialService {
      *
      */
     public readPartNum() {
-        this.usbCmd(USB_CMD_READ_PART_NUM, null);
+        this.usbCmd(gConst.USB_CMD_READ_PART_NUM, null);
     }
 
     /***********************************************************************************************
@@ -480,14 +433,14 @@ export class SerialService {
 
         this.seqNum = ++this.seqNum % 256;
         msgIdx = 0;
-        pktView.setUint16(msgIdx, SL_MSG_USB_CMD, LE);
+        pktView.setUint16(msgIdx, gConst.SL_MSG_USB_CMD, gConst.LE);
         msgIdx += 2;
         msgIdx += 2 + 1; // len + crc
         // cmd data
         pktView.setUint8(msgIdx++, this.seqNum);
         pktView.setUint8(msgIdx++, cmdID);
         switch(cmdID) {
-            case USB_CMD_WR_KEYS: {
+            case gConst.USB_CMD_WR_KEYS: {
                 for(i = 0; i < 16; i++) {
                     let chrCode = param.nwkKey.charCodeAt(i);
                     if(chrCode) {
@@ -497,11 +450,11 @@ export class SerialService {
                         pktView.setUint8(msgIdx++, 0);
                     }
                 }
-                pktView.setUint16(msgIdx, param.panId, LE);
+                pktView.setUint16(msgIdx, param.panId, gConst.LE);
                 msgIdx += 2;
                 break;
             }
-            case USB_CMD_WR_NODE_DATA_0: {
+            case gConst.USB_CMD_WR_NODE_DATA_0: {
                 let data = new Uint8Array(param.buf);
                 for(i = 0; i < param.buf.byteLength; i++) {
                     pktView.setUint8(msgIdx++, data[i]);
@@ -513,24 +466,24 @@ export class SerialService {
             }
         }
         let msgLen = msgIdx;
-        let dataLen = msgLen - HEAD_LEN;
-        pktView.setUint16(LEN_IDX, dataLen, LE);
+        let dataLen = msgLen - gConst.HEAD_LEN;
+        pktView.setUint16(gConst.LEN_IDX, dataLen, gConst.LE);
         let crc = 0;
         for(i = 0; i < msgLen; i++) {
             crc ^= pktData[i];
         }
-        pktView.setUint8(CRC_IDX, crc);
+        pktView.setUint8(gConst.CRC_IDX, crc);
 
         msgIdx = 0;
-        slMsgBuf[msgIdx++] = SL_START_CHAR;
+        slMsgBuf[msgIdx++] = gConst.SL_START_CHAR;
         for(i = 0; i < msgLen; i++) {
             if(pktData[i] < 0x10) {
                 pktData[i] ^= 0x10;
-                slMsgBuf[msgIdx++] = SL_ESC_CHAR;
+                slMsgBuf[msgIdx++] = gConst.SL_ESC_CHAR;
             }
             slMsgBuf[msgIdx++] = pktData[i];
         }
-        slMsgBuf[msgIdx++] = SL_END_CHAR;
+        slMsgBuf[msgIdx++] = gConst.SL_END_CHAR;
 
         let slMsgLen = msgIdx;
         let slMsg = slMsgBuf.slice(0, slMsgLen);
@@ -542,7 +495,7 @@ export class SerialService {
             await this.serial.writeHex(slHexMsg);
         }
         catch(err) {
-            console.log('serial write err: ' + JSON.stringify(err));
+            console.log(`serial write err: ${JSON.stringify(err)}`, 'red', 7);
         }
     }
 }

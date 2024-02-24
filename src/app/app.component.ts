@@ -1,7 +1,7 @@
 import { Component, NgZone, OnDestroy, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
 import { GlobalsService } from './globals.service';
 import { EventsService } from './events.service';
-import { SerialService, rdKeys_t } from './serial.service';
+import { SerialService } from './serial.service';
 import { Validators, FormGroup, FormControl } from '@angular/forms';
 
 import { HTU21D_005_Component } from './htu21d-005/htu21d-005.component';
@@ -13,8 +13,8 @@ import { DBL_SW_008_Component } from './dbl-sw-008/dbl-sw-008.component';
 import { ZB_Bridge_Component } from './zb-bridge/zb-bridge.component';
 import { Subscription } from 'rxjs';
 
-const USB_CMD_STATUS_OK = 0x00;
-//const USB_CMD_STATUS_FAIL = 0x01;
+import * as gIF from './gIF';
+import * as gConst from './gConst';
 
 @Component({
     selector: 'app-root',
@@ -32,7 +32,7 @@ export class AppComponent implements OnInit, OnDestroy {
     panIdFormCtrl: FormControl;
     subscription = new Subscription();
 
-    logs: string[] = [];
+    logs: gIF.msgLogs_t[] = [];
     scrollFlag = true;
 
     partNum = 0;
@@ -42,7 +42,6 @@ export class AppComponent implements OnInit, OnDestroy {
     constructor(public serial: SerialService,
                 public globals: GlobalsService,
                 private events: EventsService,
-                //private cfr: ComponentFactoryResolver,
                 private ngZone: NgZone) {
         // ---
     }
@@ -106,13 +105,21 @@ export class AppComponent implements OnInit, OnDestroy {
             this.ngOnDestroy();
         };
 
-        this.events.subscribe('logMsg', (msg: string)=>{
-            while(this.logs.length >= 20) {
-                this.logs.shift();
+        this.events.subscribe('logMsg', (msg: gIF.msgLogs_t)=>{
+            const last = this.logs.slice(-1)[0];
+            if(this.logs.length && (last.id === 7) && (msg.id === 7)){
+                this.ngZone.run(()=>{
+                    this.logs[this.logs.length - 1] = msg;
+                });
             }
-            this.ngZone.run(()=>{
-                this.logs.push(msg);
-            });
+            else {
+                while(this.logs.length >= 20) {
+                    this.logs.shift();
+                }
+                this.ngZone.run(()=>{
+                    this.logs.push(msg);
+                });
+            }
             if(this.scrollFlag == true) {
                 let logsDiv = document.getElementById('logList');
                 logsDiv.scrollTop = logsDiv.scrollHeight;
@@ -125,32 +132,26 @@ export class AppComponent implements OnInit, OnDestroy {
                 this.viewRef.clear();
                 switch(this.partNum) {
                     case this.globals.ZB_BRIDGE: {
-                        //const factory = this.cfr.resolveComponentFactory(ZB_Bridge_Component);
                         this.viewRef.createComponent(ZB_Bridge_Component);
                         break;
                     }
                     case this.globals.HTU21D_005: {
-                        //const factory = this.cfr.resolveComponentFactory(HTU21D_005_Component);
                         this.viewRef.createComponent(HTU21D_005_Component);
                         break;
                     }
                     case this.globals.SH_006: {
-                        //const factory = this.cfr.resolveComponentFactory(SH_006_Component);
                         this.viewRef.createComponent(SH_006_Component);
                         break;
                     }
                     case this.globals.DBL_SW_008: {
-                        //const factory = this.cfr.resolveComponentFactory(DBL_SW_008_Component);
                         this.viewRef.createComponent(DBL_SW_008_Component);
                         break;
                     }
                     case this.globals.ACTUATOR_010: {
-                        //const factory = this.cfr.resolveComponentFactory(Actuator_010_Component);
                         this.viewRef.createComponent(Actuator_010_Component);
                         break;
                     }
                     case this.globals.SSR_009: {
-                        //const factory = this.cfr.resolveComponentFactory(SSR_009_Component);
                         this.viewRef.createComponent(SSR_009_Component);
                         break;
                     }
@@ -227,8 +228,8 @@ export class AppComponent implements OnInit, OnDestroy {
      * brief
      *
      */
-    rdKeysMsg(msg: rdKeys_t) {
-        if(msg.status == USB_CMD_STATUS_OK) {
+    rdKeysMsg(msg: gIF.rdKeys_t) {
+        if(msg.status == gConst.USB_CMD_STATUS_OK) {
             console.log(`msg: ${JSON.stringify(msg)}`);
             this.ngZone.run(()=>{
                 this.nwkKeyFormCtrl.setValue(msg.nwkKey);
